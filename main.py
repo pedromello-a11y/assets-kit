@@ -25,20 +25,23 @@ BASE_DIR = Path(__file__).resolve().parent
 REFERENCE_IMAGE_PATH = BASE_DIR / "MODELO_AVATAR.png"
 
 BASE_PROMPT = (
-    "Use this exact avatar base as the fixed character template. "
-    "Do not change the body, pose, face, proportions, or art style. "
+    "Use this exact avatar base as the fixed character template only as a SIZE AND POSITION REFERENCE. "
+    "Do not redraw the avatar body, head, skin, arms, hands, legs, feet, hair, eyes, face, or any character features. "
     "Create only the FRONT visible portion of the requested clothing item as a separate modular asset. "
+    "Render only the clothing item, isolated, with empty interior where the body would be. "
     "Do not generate back parts, side wraparound parts, inner collar behind the neck, "
     "or any area hidden behind the avatar body. "
-    "The asset must match the avatar at the exact same scale, exact same alignment, "
+    "The clothing item must match the avatar at the exact same scale, exact same alignment, "
     "and exact same proportions, so that if layered directly on top of the base avatar, "
     "it fits perfectly without any manual resizing or repositioning. "
     "Front view only. "
-    "Output only the modular item. "
+    "Output only the modular clothing item. "
     "Same outline thickness. "
     "Same vintage cartoon style. "
     "Same canvas size and same framing as the base avatar. "
-    "Solid MAGENTA background (#FF00FF)."
+    "Background must be a SINGLE FLAT SOLID MAGENTA (#FF00FF). "
+    "No checkerboard. No transparency grid. No texture. No pattern. No gradient. "
+    "No shadows or lighting on the background."
 )
 
 MAGENTA = (255, 0, 255)
