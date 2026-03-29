@@ -2,6 +2,7 @@ import os
 import io
 import base64
 from pathlib import Path
+from collections import deque
 
 import httpx
 import numpy as np
@@ -20,11 +21,10 @@ GEMINI_API_URL = (
     f"{GEMINI_MODEL}:generateContent"
 )
 
-# Lê o PNG fixo da pasta do projeto
 BASE_DIR = Path(__file__).resolve().parent
 REFERENCE_IMAGE_PATH = BASE_DIR / "MODELO_AVATAR.png"
 
-BASE_PROMPT = (
+BASE_PROMPT_TEMPLATE = (
     "Use this exact avatar base as the fixed character template only as a SIZE AND POSITION REFERENCE. "
     "Do not redraw the avatar body, head, skin, arms, hands, legs, feet, hair, eyes, face, or any character features. "
     "Create only the FRONT visible portion of the requested clothing item as a separate modular asset. "
@@ -41,15 +41,13 @@ BASE_PROMPT = (
     "Same canvas size and same framing as the base avatar. "
     "Background must be a SINGLE FLAT SOLID MAGENTA (#FF00FF). "
     "No checkerboard. No transparency grid. No texture. No pattern. No gradient. "
-    "No shadows or lighting on the background."
+    "No shadows or lighting on the background. "
+    "Requested clothing item: {item_description}."
 )
-
-MAGENTA = (255, 0, 255)
-TOLERANCE = 30
 
 
 class AvatarRequest(BaseModel):
-    prompt: str
+    item_description: str
 
 
 @app.get("/")
@@ -72,23 +70,52 @@ def load_reference_image_base64() -> str:
 
 def remove_magenta(image_bytes: bytes) -> bytes:
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
-    data = np.array(img, dtype=np.uint8)
 
-    r = data[:, :, 0].astype(np.int16)
-    g = data[:, :, 1].astype(np.int16)
-    b = data[:, :, 2].astype(np.int16)
+    rgba = np.array(img, dtype=np.uint8)
+    hsv = np.array(img.convert("HSV"), dtype=np.uint8)
 
-    mask = (
-        (np.abs(r - MAGENTA[0]) <= TOLERANCE)
-        & (np.abs(g - MAGENTA[1]) <= TOLERANCE)
-        & (np.abs(b - MAGENTA[2]) <= TOLERANCE)
+    h = hsv[:, :, 0]
+    s = hsv[:, :, 1]
+    v = hsv[:, :, 2]
+
+    magenta_mask = (
+        (h >= 185) & (h <= 235) &
+        (s >= 40) &
+        (v >= 30)
     )
 
-    data[mask, 3] = 0
+    height, width = magenta_mask.shape
+    visited = np.zeros((height, width), dtype=bool)
+    q = deque()
 
-    result = Image.fromarray(data, "RGBA")
+    def try_add(y, x):
+        if 0 <= y < height and 0 <= x < width:
+            if magenta_mask[y, x] and not visited[y, x]:
+                visited[y, x] = True
+                q.append((y, x))
+
+    for x in range(width):
+        try_add(0, x)
+        try_add(height - 1, x)
+
+    for y in range(height):
+        try_add(y, 0)
+        try_add(y, width - 1)
+
+    directions = [
+        (-1, 0), (1, 0), (0, -1), (0, 1),
+        (-1, -1), (-1, 1), (1, -1), (1, 1)
+    ]
+
+    while q:
+        y, x = q.popleft()
+        for dy, dx in directions:
+            try_add(y + dy, x + dx)
+
+    rgba[visited, 3] = 0
+
     out = io.BytesIO()
-    result.save(out, format="PNG")
+    Image.fromarray(rgba, "RGBA").save(out, format="PNG")
     out.seek(0)
     return out.read()
 
@@ -124,7 +151,9 @@ async def generate_avatar(request: AvatarRequest):
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    full_prompt = f"{BASE_PROMPT}\n\nItem request: {request.prompt}"
+    full_prompt = BASE_PROMPT_TEMPLATE.format(
+        item_description=request.item_description
+    )
 
     payload = {
         "contents": [
@@ -144,7 +173,11 @@ async def generate_avatar(request: AvatarRequest):
             }
         ],
         "generationConfig": {
-            "responseModalities": ["IMAGE"]
+            "responseModalities": ["Image"],
+            "imageConfig": {
+                "aspectRatio": "1:1",
+                "imageSize": "0.5K"
+            }
         }
     }
 
