@@ -25,23 +25,18 @@ BASE_DIR = Path(__file__).resolve().parent
 REFERENCE_IMAGE_PATH = BASE_DIR / "MODELO_AVATAR.png"
 
 BASE_PROMPT_TEMPLATE = (
-    "Use this exact avatar base as the fixed character template only as a SIZE AND POSITION REFERENCE. "
-    "Do not redraw the avatar body, head, skin, arms, hands, legs, feet, hair, eyes, face, or any character features. "
-    "Create only the FRONT visible portion of the requested clothing item as a separate modular asset. "
-    "Render only the clothing item, isolated, with empty interior where the body would be. "
-    "Do not generate back parts, side wraparound parts, inner collar behind the neck, "
-    "or any area hidden behind the avatar body. "
-    "The clothing item must match the avatar at the exact same scale, exact same alignment, "
-    "and exact same proportions, so that if layered directly on top of the base avatar, "
-    "it fits perfectly without any manual resizing or repositioning. "
-    "Front view only. "
-    "Output only the modular clothing item. "
-    "Same outline thickness. "
-    "Same vintage cartoon style. "
-    "Same canvas size and same framing as the base avatar. "
-    "Background must be a SINGLE FLAT SOLID MAGENTA (#FF00FF). "
-    "No checkerboard. No transparency grid. No texture. No pattern. No gradient. "
-    "No shadows or lighting on the background. "
+    "Use the provided avatar image only as a SIZE, POSITION, and PROPORTION REFERENCE. "
+    "Do not redraw the character, body, skin, head, face, hair, arms, hands, legs, or feet. "
+    "Generate only the requested clothing item as a separate modular asset. "
+    "The result must be a standalone garment cutout, centered in the same canvas, aligned to the avatar perfectly. "
+    "Show ONLY the FRONT visible exterior of the garment. "
+    "Do not generate any back side, rear panel, hidden surface, wraparound side surface, lining, underlayer, "
+    "or any part that would go behind the avatar's body. "
+    "The garment must be ready to be layered directly on top of the avatar without any resizing or repositioning. "
+    "Any enclosed internal opening of the garment must remain empty and must not be filled with body geometry or background color. "
+    "Background must be a SINGLE FLAT SOLID MAGENTA (#FF00FF) only OUTSIDE the garment silhouette. "
+    "No checkerboard. No transparency grid. No pattern. No gradient. No texture on the background. "
+    "Same outline thickness. Same style has reference. Same framing as the avatar base. "
     "Requested clothing item: {item_description}."
 )
 
@@ -74,26 +69,39 @@ def remove_magenta(image_bytes: bytes) -> bytes:
     rgba = np.array(img, dtype=np.uint8)
     hsv = np.array(img.convert("HSV"), dtype=np.uint8)
 
-    h = hsv[:, :, 0]
-    s = hsv[:, :, 1]
-    v = hsv[:, :, 2]
+    h = hsv[:, :, 0].astype(np.int16)
+    s = hsv[:, :, 1].astype(np.int16)
+    v = hsv[:, :, 2].astype(np.int16)
 
-    magenta_mask = (
+    r = rgba[:, :, 0].astype(np.int16)
+    g = rgba[:, :, 1].astype(np.int16)
+    b = rgba[:, :, 2].astype(np.int16)
+
+    # Fundo externo roxo/magenta mais amplo
+    broad_magenta_mask = (
         (h >= 185) & (h <= 235) &
-        (s >= 40) &
-        (v >= 30)
+        (s >= 35) &
+        (v >= 35)
     )
 
-    height, width = magenta_mask.shape
+    # Magenta quase puro, inclusive em ilhas internas
+    pure_magenta_mask = (
+        (np.abs(r - 255) <= 45) &
+        (np.abs(g - 0) <= 55) &
+        (np.abs(b - 255) <= 45)
+    )
+
+    height, width = broad_magenta_mask.shape
     visited = np.zeros((height, width), dtype=bool)
     q = deque()
 
     def try_add(y, x):
         if 0 <= y < height and 0 <= x < width:
-            if magenta_mask[y, x] and not visited[y, x]:
+            if broad_magenta_mask[y, x] and not visited[y, x]:
                 visited[y, x] = True
                 q.append((y, x))
 
+    # Remove apenas o fundo externo conectado às bordas
     for x in range(width):
         try_add(0, x)
         try_add(height - 1, x)
@@ -112,7 +120,11 @@ def remove_magenta(image_bytes: bytes) -> bytes:
         for dy, dx in directions:
             try_add(y + dy, x + dx)
 
+    # 1) fundo externo
     rgba[visited, 3] = 0
+
+    # 2) magenta puro restante dentro de aberturas internas
+    rgba[pure_magenta_mask, 3] = 0
 
     out = io.BytesIO()
     Image.fromarray(rgba, "RGBA").save(out, format="PNG")
@@ -173,7 +185,7 @@ async def generate_avatar(request: AvatarRequest):
             }
         ],
         "generationConfig": {
-            "responseModalities": ["Image"],
+            "responseModalities": ["IMAGE"],
             "imageConfig": {
                 "aspectRatio": "1:1",
                 "imageSize": "512"
