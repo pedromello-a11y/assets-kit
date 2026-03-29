@@ -31,6 +31,7 @@ BASE_PROMPT_TEMPLATE = (
     "Do not generate any back side, rear panel, hidden surface, wraparound side surface, inner hidden structure, or any part that would go behind the avatar when layered on top. "
     "Keep the requested item in its correct intended colors, materials, textures, and design details. "
     "Do not recolor the requested item to magenta. "
+    "The background must be solid pure MAGENTA (#FF00FF)"
     "Render the avatar reference itself as a flat solid pure MAGENTA (#FF00FF), including all visible body and character areas, so the avatar can be removed later by chroma key. "
     "The requested item must remain fully visible in front of the magenta avatar reference and must not be merged with the avatar silhouette. "
     "Use the exact same canvas size, framing, centering, proportions, and alignment as the reference. "
