@@ -25,14 +25,18 @@ BASE_DIR = Path(__file__).resolve().parent
 REFERENCE_IMAGE_PATH = BASE_DIR / "MODELO_AVATAR.png"
 
 BASE_PROMPT_TEMPLATE = (
-    Create only a front-view {item_description} as a modular PNG asset using the uploaded avatar as an exact fit template.
-The {item_description} must fit the avatar perfectly at 100% scale with no resizing, no repositioning, and no manual adjustment when layered on top of the base avatar. 
-Use the exact same canvas size, framing, centering, proportions, and alignment as the reference.
-Show only the front of the {item_description}. 
-Output only the {item_description}, isolated, with ackground must be a SINGLE FLAT SOLID MAGENTA (#FF00FF) only OUTSIDE the garment silhouette. 
-No checkerboard, no fake transparency, no body, no mannequin, no full character. 
-Match the exact style and outline thickness of the reference avatar.
-The output must be 1000x1000 just has de reference image."
+    "Use the uploaded avatar only as an exact fit reference for size, scale, position, alignment, and proportions. "
+    "Generate only the requested item as a standalone modular PNG asset, perfectly fitted to the avatar at 100% scale with no resizing, no repositioning, and no manual adjustment. "
+    "Show only the FRONT visible exterior of the item. "
+    "Do not generate any back side, rear panel, hidden surface, wraparound side surface, inner hidden structure, or any part that would go behind the avatar when layered on top. "
+    "Keep the requested item in its correct intended colors, materials, textures, and design details. "
+    "Do not recolor the requested item to magenta. "
+    "Render the avatar reference itself as a flat solid pure MAGENTA (#FF00FF), including all visible body and character areas, so the avatar can be removed later by chroma key. "
+    "The requested item must remain fully visible in front of the magenta avatar reference and must not be merged with the avatar silhouette. "
+    "Use the exact same canvas size, framing, centering, proportions, and alignment as the reference. "
+    "No checkerboard. No fake transparency. No gradient. No textured background. "
+    "Match the exact style and outline thickness of the reference avatar. "
+    "Requested item: {item_description}."
 )
 
 
