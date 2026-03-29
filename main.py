@@ -1,25 +1,44 @@
 import os
 import io
 import base64
+from pathlib import Path
+
 import httpx
+import numpy as np
+from PIL import Image
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from PIL import Image
-import numpy as np
 
 app = FastAPI()
 
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-image-preview")
+
 GEMINI_API_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-2.0-flash-preview-image-generation:generateContent"
+    f"https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{GEMINI_MODEL}:generateContent"
 )
 
+# Lê o PNG fixo da pasta do projeto
+BASE_DIR = Path(__file__).resolve().parent
+REFERENCE_IMAGE_PATH = BASE_DIR / "MODELO_AVATAR.png"
+
 BASE_PROMPT = (
-    "cartoon illustration character, full body, front-facing, male, "
-    "light skin tone, dark curly hair, brown eyes, mustache, neutral expression, "
-    "MAGENTA background (#FF00FF), clean illustration style"
+    "Use this exact avatar base as the fixed character template. "
+    "Do not change the body, pose, face, proportions, or art style. "
+    "Create only the FRONT visible portion of the requested clothing item as a separate modular asset. "
+    "Do not generate back parts, side wraparound parts, inner collar behind the neck, "
+    "or any area hidden behind the avatar body. "
+    "The asset must match the avatar at the exact same scale, exact same alignment, "
+    "and exact same proportions, so that if layered directly on top of the base avatar, "
+    "it fits perfectly without any manual resizing or repositioning. "
+    "Front view only. "
+    "Output only the modular item. "
+    "Same outline thickness. "
+    "Same vintage cartoon style. "
+    "Same canvas size and same framing as the base avatar. "
+    "Solid MAGENTA background (#FF00FF)."
 )
 
 MAGENTA = (255, 0, 255)
@@ -30,11 +49,31 @@ class AvatarRequest(BaseModel):
     prompt: str
 
 
+@app.get("/")
+async def root():
+    return {"ok": True, "service": "assets-kit"}
+
+
+@app.get("/health")
+async def health():
+    return {"ok": True}
+
+
+def load_reference_image_base64() -> str:
+    if not REFERENCE_IMAGE_PATH.exists():
+        raise FileNotFoundError(f"Arquivo não encontrado: {REFERENCE_IMAGE_PATH}")
+
+    with open(REFERENCE_IMAGE_PATH, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
+
+
 def remove_magenta(image_bytes: bytes) -> bytes:
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
-    data = np.array(img, dtype=np.int32)
+    data = np.array(img, dtype=np.uint8)
 
-    r, g, b, a = data[:, :, 0], data[:, :, 1], data[:, :, 2], data[:, :, 3]
+    r = data[:, :, 0].astype(np.int16)
+    g = data[:, :, 1].astype(np.int16)
+    b = data[:, :, 2].astype(np.int16)
 
     mask = (
         (np.abs(r - MAGENTA[0]) <= TOLERANCE)
@@ -42,30 +81,86 @@ def remove_magenta(image_bytes: bytes) -> bytes:
         & (np.abs(b - MAGENTA[2]) <= TOLERANCE)
     )
 
-    data[:, :, 3] = np.where(mask, 0, a)
+    data[mask, 3] = 0
 
-    result = Image.fromarray(data.astype(np.uint8), "RGBA")
+    result = Image.fromarray(data, "RGBA")
     out = io.BytesIO()
     result.save(out, format="PNG")
     out.seek(0)
     return out.read()
 
 
+def extract_image_bytes(body: dict) -> bytes | None:
+    candidates = body.get("candidates", [])
+    for candidate in candidates:
+        content = candidate.get("content", {})
+        parts = content.get("parts", [])
+        for part in parts:
+            inline_data = part.get("inlineData") or part.get("inline_data")
+            if not inline_data:
+                continue
+
+            mime_type = inline_data.get("mimeType") or inline_data.get("mime_type", "")
+            data_b64 = inline_data.get("data")
+            if mime_type.startswith("image/") and data_b64:
+                return base64.b64decode(data_b64)
+
+    return None
+
+
 @app.post("/generate-avatar")
 async def generate_avatar(request: AvatarRequest):
-    full_prompt = f"{BASE_PROMPT}\n\n{request.prompt}"
+    if not GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="GEMINI_API_KEY não configurada nas variáveis de ambiente."
+        )
+
+    try:
+        reference_image_b64 = load_reference_image_base64()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    full_prompt = f"{BASE_PROMPT}\n\nItem request: {request.prompt}"
 
     payload = {
-        "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {"responseModalities": ["IMAGE", "TEXT"]},
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "inlineData": {
+                            "mimeType": "image/png",
+                            "data": reference_image_b64
+                        }
+                    },
+                    {
+                        "text": full_prompt
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {
+            "responseModalities": ["IMAGE"]
+        }
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.post(
-            GEMINI_API_URL,
-            params={"key": GEMINI_API_KEY},
-            json=payload,
-        )
+    headers = {
+        "x-goog-api-key": GEMINI_API_KEY,
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                GEMINI_API_URL,
+                headers=headers,
+                json=payload,
+            )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timeout ao chamar a Gemini API.")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Erro de rede na Gemini API: {str(e)}")
 
     if response.status_code != 200:
         raise HTTPException(
@@ -73,25 +168,22 @@ async def generate_avatar(request: AvatarRequest):
             detail=f"Gemini API error {response.status_code}: {response.text}",
         )
 
-    body = response.json()
-
-    image_b64 = None
     try:
-        for part in body["candidates"][0]["content"]["parts"]:
-            if part.get("inlineData", {}).get("mimeType", "").startswith("image/"):
-                image_b64 = part["inlineData"]["data"]
-                break
-    except (KeyError, IndexError):
-        pass
+        body = response.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Resposta inválida da Gemini API.")
 
-    if image_b64 is None:
-        raise HTTPException(status_code=502, detail="No image returned by Gemini API")
+    image_bytes = extract_image_bytes(body)
+    if not image_bytes:
+        raise HTTPException(
+            status_code=502,
+            detail=f"A Gemini respondeu, mas não retornou imagem. Resposta: {body}"
+        )
 
-    image_bytes = base64.b64decode(image_b64)
     transparent_png = remove_magenta(image_bytes)
 
     return StreamingResponse(
         io.BytesIO(transparent_png),
         media_type="image/png",
-        headers={"Content-Disposition": "inline; filename=avatar.png"},
+        headers={"Content-Disposition": 'inline; filename="avatar.png"'},
     )
