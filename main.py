@@ -176,7 +176,7 @@ async def generate_avatar(request: AvatarRequest):
             "responseModalities": ["Image"],
             "imageConfig": {
                 "aspectRatio": "1:1",
-                "imageSize": "0.5K"
+                "imageSize": "512"
             }
         }
     }
