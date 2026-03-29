@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assets Kit</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0e0e12;
+      color: #e4e4f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px 64px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    header h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #c084fc, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      margin-top: 8px;
+      color: #6b7280;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #16161e;
+      border: 1px solid #2a2a3a;
+      border-radius: 16px;
+      padding: 32px;
+      width: 100%;
+      max-width: 560px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: #0e0e12;
+      border: 1px solid #2a2a3a;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 1rem;
+      color: #e4e4f0;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]::placeholder { color: #4b5563; }
+
+    input[type="text"]:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    #btn-generate {
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      color: #fff;
+      padding: 12px 22px;
+      white-space: nowrap;
+    }
+
+    #btn-generate:hover:not(:disabled) { opacity: 0.88; }
+
+    /* Preview */
+    .preview-wrapper {
+      margin-top: 28px;
+    }
+
+    .preview-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    #btn-download {
+      background: #1e293b;
+      color: #a5b4fc;
+      border: 1px solid #334155;
+      padding: 7px 16px;
+      font-size: 0.82rem;
+      border-radius: 8px;
+    }
+
+    #btn-download:hover:not(:disabled) {
+      background: #263451;
+    }
+
+    .preview-area {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 12px;
+      border: 1px solid #2a2a3a;
+      overflow: hidden;
+      position: relative;
+      background-color: #111;
+      background-image:
+        linear-gradient(45deg, #1e1e2e 25%, transparent 25%),
+        linear-gradient(-45deg, #1e1e2e 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #1e1e2e 75%),
+        linear-gradient(-45deg, transparent 75%, #1e1e2e 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-area img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .placeholder-text {
+      color: #374151;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 16px;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Loading spinner */
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #2a2a3a;
+      border-top-color: #7c3aed;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error */
+    .error-box {
+      margin-top: 16px;
+      background: #1f0a0a;
+      border: 1px solid #7f1d1d;
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: #fca5a5;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .error-box.visible { display: block; }
+
+    @media (max-width: 480px) {
+      .input-row { flex-direction: column; }
+      #btn-generate { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Assets Kit</h1>
+    <p>Gere assets de equipamentos para o seu avatar</p>
+  </header>
+
+  <div class="card">
+    <label for="item-input">Descreva o item</label>
+    <div class="input-row">
+      <input
+        type="text"
+        id="item-input"
+        placeholder="Ex: camisa xadrez vermelha"
+        autocomplete="off"
+      />
+      <button id="btn-generate" onclick="generate()">Gerar asset</button>
+    </div>
+
+    <div id="error-box" class="error-box"></div>
+
+    <div class="preview-wrapper">
+      <div class="preview-label">
+        <label style="margin:0">Preview</label>
+        <button id="btn-download" disabled onclick="download()">&#8595; Download PNG</button>
+      </div>
+      <div class="preview-area" id="preview-area">
+        <span class="placeholder-text" id="placeholder">
+          Seu asset aparecerá aqui com fundo transparente
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentObjectURL = null;
+
+    const input = document.getElementById('item-input');
+    const btnGenerate = document.getElementById('btn-generate');
+    const btnDownload = document.getElementById('btn-download');
+    const previewArea = document.getElementById('preview-area');
+    const placeholder = document.getElementById('placeholder');
+    const errorBox = document.getElementById('error-box');
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') generate();
+    });
+
+    function setLoading(on) {
+      btnGenerate.disabled = on;
+      btnGenerate.textContent = on ? 'Gerando…' : 'Gerar asset';
+      if (on) {
+        clearPreview();
+        const spinner = document.createElement('div');
+        spinner.className = 'spinner';
+        spinner.id = 'spinner';
+        previewArea.appendChild(spinner);
+      } else {
+        const spinner = document.getElementById('spinner');
+        if (spinner) spinner.remove();
+      }
+    }
+
+    function clearPreview() {
+      if (currentObjectURL) {
+        URL.revokeObjectURL(currentObjectURL);
+        currentObjectURL = null;
+      }
+      const img = previewArea.querySelector('img');
+      if (img) img.remove();
+      placeholder.style.display = 'block';
+      btnDownload.disabled = true;
+      errorBox.classList.remove('visible');
+      errorBox.textContent = '';
+    }
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.classList.add('visible');
+    }
+
+    async function generate() {
+      const description = input.value.trim();
+      if (!description) {
+        input.focus();
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const res = await fetch('/generate-avatar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_description: description }),
+        });
+
+        if (!res.ok) {
+          let detail = `Erro ${res.status}`;
+          try {
+            const json = await res.json();
+            detail = json.detail || detail;
+          } catch (_) {}
+          throw new Error(detail);
+        }
+
+        const blob = await res.blob();
+        currentObjectURL = URL.createObjectURL(blob);
+
+        placeholder.style.display = 'none';
+
+        const img = document.createElement('img');
+        img.src = currentObjectURL;
+        img.alt = description;
+        previewArea.appendChild(img);
+
+        btnDownload.disabled = false;
+
+      } catch (err) {
+        showError('Falha ao gerar asset: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function download() {
+      if (!currentObjectURL) return;
+      const a = document.createElement('a');
+      a.href = currentObjectURL;
+      const slug = input.value.trim().replace(/\s+/g, '_').toLowerCase() || 'asset';
+      a.download = `${slug}.png`;
+      a.click();
+    }
+  </script>
+
+</body>
+</html>

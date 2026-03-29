@@ -4,3 +4,4 @@ httpx==0.28.1
 Pillow==11.1.0
 numpy==2.2.2
 pydantic==2.10.6
+aiofiles==24.1.0

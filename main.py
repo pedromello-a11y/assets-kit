@@ -8,10 +8,15 @@ import httpx
 import numpy as np
 from PIL import Image
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI()
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-image-preview")
@@ -53,6 +58,14 @@ async def root():
 @app.get("/health")
 async def health():
     return {"ok": True}
+
+
+@app.get("/ui", response_class=FileResponse)
+async def ui():
+    index = STATIC_DIR / "index.html"
+    if not index.exists():
+        raise HTTPException(status_code=404, detail="UI não encontrada.")
+    return FileResponse(index)
 
 
 def load_reference_image_base64() -> str:
