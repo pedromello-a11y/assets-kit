@@ -25,19 +25,14 @@ BASE_DIR = Path(__file__).resolve().parent
 REFERENCE_IMAGE_PATH = BASE_DIR / "MODELO_AVATAR.png"
 
 BASE_PROMPT_TEMPLATE = (
-    "Use the provided avatar image only as a SIZE, POSITION, and PROPORTION REFERENCE. "
-    "Do not redraw the character, body, skin, head, face, hair, arms, hands, legs, or feet. "
-    "Generate only the requested clothing item as a separate modular asset. "
-    "The result must be a standalone garment cutout, centered in the same canvas, aligned to the avatar perfectly. "
-    "Show ONLY the FRONT visible exterior of the garment. "
-    "Do not generate any back side, rear panel, hidden surface, wraparound side surface, lining, underlayer, "
-    "or any part that would go behind the avatar's body. "
-    "The garment must be ready to be layered directly on top of the avatar without any resizing or repositioning. "
-    "Any enclosed internal opening of the garment must remain empty and must not be filled with body geometry or background color. "
-    "Background must be a SINGLE FLAT SOLID MAGENTA (#FF00FF) only OUTSIDE the garment silhouette. "
-    "No checkerboard. No transparency grid. No pattern. No gradient. No texture on the background. "
-    "Same outline thickness. Same style has reference. Same framing as the avatar base. "
-    "Requested clothing item: {item_description}."
+    Create only a front-view {item_description} as a modular PNG asset using the uploaded avatar as an exact fit template.
+The {item_description} must fit the avatar perfectly at 100% scale with no resizing, no repositioning, and no manual adjustment when layered on top of the base avatar. 
+Use the exact same canvas size, framing, centering, proportions, and alignment as the reference.
+Show only the front of the {item_description}. 
+Output only the {item_description}, isolated, with ackground must be a SINGLE FLAT SOLID MAGENTA (#FF00FF) only OUTSIDE the garment silhouette. 
+No checkerboard, no fake transparency, no body, no mannequin, no full character. 
+Match the exact style and outline thickness of the reference avatar.
+The output must be 1000x1000 just has de reference image."
 )
 
 
@@ -188,7 +183,7 @@ async def generate_avatar(request: AvatarRequest):
             "responseModalities": ["IMAGE"],
             "imageConfig": {
                 "aspectRatio": "1:1",
-                "imageSize": "512"
+                "imageSize": "1K"
             }
         }
     }
